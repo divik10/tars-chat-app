@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { formatMessageTimestamp } from "@/lib/date";
 
 type ChatSidebarProps = {
-  selectedConversationId: string | null;
-  onSelectConversation: (conversationId: string) => void;
-  onConversationCreated: (conversationId: string) => void;
-  currentUserConvexId: string | null;
+  selectedConversationId: Id<"conversations"> | null;
+  onSelectConversation: (conversationId: Id<"conversations">) => void;
+  onConversationCreated: (conversationId: Id<"conversations">) => void;
+  currentUserConvexId: Id<"users"> | null;
 };
 
 export function ChatSidebar({
@@ -28,7 +30,7 @@ export function ChatSidebar({
 
   const conversations = useQuery(
     api.conversations.listConversationsForUser,
-    currentUserConvexId ? { userId: currentUserConvexId as any } : "skip",
+    currentUserConvexId ? { userId: currentUserConvexId } : "skip",
   );
 
   const startConversation = useMutation(api.conversations.startConversation);
@@ -40,19 +42,23 @@ export function ChatSidebar({
     return users.filter((u) => u.name.toLowerCase().includes(term));
   }, [users, search]);
 
-  const handleUserClick = async (userId: string) => {
+  const handleUserClick = async (userId: Id<"users">) => {
     if (!currentUserConvexId) return;
+    const ordered = [currentUserConvexId, userId].sort() as [
+      Id<"users">,
+      Id<"users">
+    ];
     const conversationId = await startConversation({
-      userAId: currentUserConvexId as any,
-      userBId: userId as any,
+      userAId: ordered[0],
+      userBId: ordered[1],
     });
-    onConversationCreated(conversationId as string);
-    onSelectConversation(conversationId as string);
+    onConversationCreated(conversationId);
+    onSelectConversation(conversationId);
   };
 
   return (
-    <aside className="flex h-full w-72 flex-col border-r bg-background">
-      <div className="border-b p-3">
+    <aside className="flex h-full w-full flex-col border-r border-foreground/10 bg-slate-50/70 shadow-sm md:w-72">
+      <div className="border-b border-foreground/10 p-3">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -76,33 +82,37 @@ export function ChatSidebar({
         {conversations &&
           conversations.map((conv) => {
             const other = conv.otherUsers[0];
+            const timestamp = formatMessageTimestamp(conv.updatedAt);
             return (
               <button
                 key={conv.conversationId}
-                onClick={() =>
-                  onSelectConversation(conv.conversationId as string)
-                }
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-foreground/5 ${
+                onClick={() => onSelectConversation(conv.conversationId)}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
                   selectedConversationId === conv.conversationId
-                    ? "bg-foreground/10"
-                    : ""
+                    ? "bg-sky-100/80 text-slate-900"
+                    : "hover:bg-slate-100/70"
                 }`}
               >
                 <Avatar src={other?.imageUrl} alt={other?.name ?? "User"} />
                 <div className="flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate font-medium">
+                    <span className="truncate text-sm font-medium">
                       {other?.name ?? "Unknown"}
                     </span>
+                    <span className="shrink-0 text-[10px] text-foreground/45">
+                      {timestamp}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex items-center justify-between gap-2">
+                    <p className="line-clamp-1 text-xs text-foreground/60">
+                      {conv.lastMessage?.content ?? "No messages yet"}
+                    </p>
                     {conv.unreadCount > 0 && (
-                      <span className="ml-1 rounded-full bg-foreground px-1.5 py-0.5 text-[10px] font-semibold text-background">
+                      <span className="ml-1 shrink-0 rounded-full bg-sky-600 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm">
                         {conv.unreadCount}
                       </span>
                     )}
                   </div>
-                  <p className="line-clamp-1 text-xs text-foreground/60">
-                    {conv.lastMessage?.content ?? "No messages yet"}
-                  </p>
                 </div>
               </button>
             );
@@ -117,8 +127,8 @@ export function ChatSidebar({
         {filteredUsers.map((u) => (
           <button
             key={u._id}
-            onClick={() => handleUserClick(u._id as string)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-foreground/5"
+            onClick={() => handleUserClick(u._id)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-100/70"
           >
             <div className="relative">
               <Avatar src={u.imageUrl} alt={u.name} />

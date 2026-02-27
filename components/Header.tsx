@@ -6,15 +6,19 @@ export function Header() {
   const { user } = useUser();
 
   return (
-    <header className="border-b bg-background">
+    <header className="border-b border-foreground/10 bg-background/90 backdrop-blur-sm">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-lg font-semibold tracking-tight">Tars Chat</span>
+          <span className="text-lg font-semibold tracking-tight">
+            Tars Chat
+          </span>
         </div>
         <div className="flex items-center gap-3">
           {user && (
             <div className="flex items-center gap-2 text-sm text-foreground/80">
-              <span className="truncate max-w-[160px]">{user.fullName ?? user.username}</span>
+              <span className="max-w-[160px] truncate">
+                {user.fullName ?? user.username}
+              </span>
             </div>
           )}
           <UserButton afterSignOutUrl="/" />

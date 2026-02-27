@@ -1,35 +1,43 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import {
+  formatMessageDateLabel,
+  formatMessageTimestamp,
+} from "@/lib/date";
 
 type ChatWindowProps = {
-  conversationId: string | null;
-  currentUserConvexId: string | null;
+  conversationId: Id<"conversations"> | null;
+  currentUserConvexId: Id<"users"> | null;
+  onBackToList?: () => void;
 };
 
 export function ChatWindow({
   conversationId,
   currentUserConvexId,
+  onBackToList,
 }: ChatWindowProps) {
   const [input, setInput] = useState("");
-  const [lastTypedAt, setLastTypedAt] = useState(0);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isAtBottomRef = useRef(true);
+  const previousLengthRef = useRef(0);
 
   const messages = useQuery(
     api.messages.listForConversation,
-    conversationId ? { conversationId: conversationId as any } : "skip",
+    conversationId ? { conversationId } : "skip"
   );
 
   const typingUsers = useQuery(
     api.conversations.typingForConversation,
     conversationId && currentUserConvexId
-      ? {
-        conversationId: conversationId as any,
-        userId: currentUserConvexId as any,
-      }
-      : "skip",
+      ? { conversationId, userId: currentUserConvexId }
+      : "skip"
   );
 
   const sendMessage = useMutation(api.messages.sendMessage);
@@ -38,17 +46,47 @@ export function ChatWindow({
 
   useEffect(() => {
     if (conversationId && currentUserConvexId) {
-      void markRead({
-        conversationId: conversationId as any,
-        userId: currentUserConvexId as any,
-      });
+      void markRead({ conversationId, userId: currentUserConvexId });
     }
   }, [conversationId, currentUserConvexId, markRead]);
 
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+    isAtBottomRef.current = true;
+    setHasNewMessages(false);
+  };
+
   useEffect(() => {
     if (!messages) return;
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const length = messages.length;
+    const prev = previousLengthRef.current;
+    previousLengthRef.current = length;
+
+    if (isAtBottomRef.current || prev === 0) {
+      scrollToBottom(prev === 0 ? "auto" : "smooth");
+      return;
+    }
+
+    if (length > prev) {
+      setHasNewMessages(true);
+    }
   }, [messages]);
+
+  const handleScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const threshold = 32;
+    const distanceFromBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight;
+
+    const atBottom = distanceFromBottom <= threshold;
+    isAtBottomRef.current = atBottom;
+
+    if (atBottom) setHasNewMessages(false);
+  };
 
   const handleSend = async () => {
     if (!conversationId || !currentUserConvexId) return;
@@ -56,120 +94,129 @@ export function ChatWindow({
     if (!trimmed) return;
 
     await sendMessage({
-      conversationId: conversationId as any,
-      senderId: currentUserConvexId as any,
+      conversationId,
+      senderId: currentUserConvexId,
       content: trimmed,
     });
 
     setInput("");
-    setLastTypedAt(0);
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+
     void setTyping({
-      conversationId: conversationId as any,
-      userId: currentUserConvexId as any,
+      conversationId,
+      userId: currentUserConvexId,
       isTyping: false,
     });
   };
 
   const handleChange = (value: string) => {
     setInput(value);
-    const now = Date.now();
-    setLastTypedAt(now);
 
     if (!conversationId || !currentUserConvexId) return;
 
     void setTyping({
-      conversationId: conversationId as any,
-      userId: currentUserConvexId as any,
+      conversationId,
+      userId: currentUserConvexId,
       isTyping: true,
     });
 
-    // Schedule a stop-typing update after 2 seconds of inactivity
-    setTimeout(() => {
-      if (Date.now() - now >= 1900) {
-        void setTyping({
-          conversationId: conversationId as any,
-          userId: currentUserConvexId as any,
-          isTyping: false,
-        });
-      }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      void setTyping({
+        conversationId,
+        userId: currentUserConvexId,
+        isTyping: false,
+      });
     }, 2000);
   };
 
   if (!conversationId) {
     return (
       <div className="flex h-full flex-1 items-center justify-center text-sm text-foreground/60">
-        Select a conversation or start a new one from the sidebar.
+        Select a conversation.
       </div>
     );
   }
 
   return (
     <section className="flex h-full flex-1 flex-col">
-      <div className="flex-1 space-y-2 overflow-y-auto bg-background px-4 py-3 text-sm">
-        {messages === undefined && (
-          <div className="text-xs text-foreground/60">
-            Loading messages...
-          </div>
-        )}
-        {messages && messages.length === 0 && (
-          <div className="text-xs text-foreground/60">
-            No messages yet. Start the conversation.
-          </div>
-        )}
-        {messages &&
-          messages.map((m) => {
+      <div className="relative flex-1 bg-background text-sm">
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex h-full flex-col space-y-2 overflow-y-auto px-4 py-4"
+        >
+          {messages?.map((m, index) => {
             const isMine = m.sender._id === currentUserConvexId;
+            const previous = index > 0 ? messages[index - 1] : null;
+
+            const showDateDivider =
+              !previous ||
+              new Date(previous.createdAt).toDateString() !==
+                new Date(m.createdAt).toDateString();
+
             return (
-              <div
-                key={m._id}
-                className={`flex gap-2 ${
-                  isMine ? "justify-end" : "justify-start"
-                }`}
-              >
-                {!isMine && (
-                  <Avatar
-                    src={m.sender.imageUrl}
-                    alt={m.sender.name}
-                  />
+              <div key={m._id} className="space-y-2">
+                {showDateDivider && (
+                  <div className="flex items-center justify-center text-[11px] text-foreground/40">
+                    {formatMessageDateLabel(m.createdAt)}
+                  </div>
                 )}
+
                 <div
-                  className={`max-w-xs rounded-2xl px-3 py-1.5 text-xs ${
-                    isMine
-                      ? "bg-foreground text-background"
-                      : "bg-foreground/10 text-foreground"
+                  className={`flex ${
+                    isMine ? "justify-end" : "justify-start"
                   }`}
                 >
-                  {!isMine && (
-                    <div className="mb-0.5 text-[10px] font-semibold opacity-80">
-                      {m.sender.name}
-                    </div>
-                  )}
-                  <div>{m.content}</div>
+                  <div
+                    className={`max-w-xs rounded-2xl px-3 py-1.5 text-xs shadow-sm ${
+                      isMine
+                        ? "bg-sky-600 text-white"
+                        : "bg-foreground/[0.06] text-foreground"
+                    }`}
+                  >
+                    {m.content}
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-foreground/40">
+                  {formatMessageTimestamp(m.createdAt)}
                 </div>
               </div>
             );
           })}
-        <div ref={bottomRef} />
+        </div>
+
+        {hasNewMessages && (
+          <button
+            onClick={() => scrollToBottom()}
+            className="absolute bottom-3 right-4 rounded-full bg-sky-600 px-3 py-1 text-xs text-white"
+          >
+            ↓ New messages
+          </button>
+        )}
       </div>
 
-      <div className="border-t bg-background px-4 py-2">
-        {typingUsers && typingUsers.length > 0 && (
-          <div className="pb-1 text-[11px] text-foreground/60">
-            {typingUsers[0].name} is typing...
-          </div>
-        )}
+      <div className="border-t border-foreground/10 px-4 py-3">
         <div className="flex items-center gap-2">
           <textarea
             value={input}
             onChange={(e) => handleChange(e.target.value)}
             rows={1}
+            className="flex-1 resize-none rounded-md border px-3 py-1.5 text-sm"
             placeholder="Type a message..."
-            className="max-h-24 flex-1 resize-none rounded-md border border-foreground/10 bg-background px-3 py-1.5 text-sm outline-none focus:border-foreground/40"
           />
           <button
             onClick={handleSend}
-            className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background disabled:opacity-50"
-            disabled={!input.trim() || !conversationId}
+            className="rounded-md bg-foreground px-3 py-1.5 text-sm text-background"
+            disabled={!input.trim()}
           >
             Send
           </button>
@@ -178,15 +225,3 @@ export function ChatWindow({
     </section>
   );
 }
-
-function Avatar({ src, alt }: { src?: string; alt: string }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      className="h-7 w-7 rounded-full object-cover"
-    />
-  );
-}
-
