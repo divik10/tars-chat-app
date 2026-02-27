@@ -1,7 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
-// List all other users for the sidebar
+
 export const listUsersForSidebar = query({
   args: {
     currentClerkId: v.string(),
@@ -14,7 +14,7 @@ export const listUsersForSidebar = query({
   },
 });
 
-// Get or create a one-on-one conversation between two users
+
 export const startConversation = mutation({
   args: {
     userAId: v.id("users"),
@@ -23,7 +23,7 @@ export const startConversation = mutation({
   handler: async (ctx, args) => {
     const participantIds = [args.userAId, args.userBId].sort();
 
-    // Try to find existing 1-1 conversation with these two participants
+
     const existing = await ctx.db
       .query("conversations")
       .filter((q) =>
@@ -63,7 +63,7 @@ export const startConversation = mutation({
   },
 });
 
-// List conversations for a given user with denormalized info
+
 export const listConversationsForUser = query({
   args: {
     userId: v.id("users"),
@@ -93,7 +93,7 @@ export const listConversationsForUser = query({
         ? await ctx.db.get(conversation.lastMessageId)
         : null;
 
-      // Compute unread count
+   
       const unreadMessages = await ctx.db
         .query("messages")
         .withIndex("by_conversation", (q) =>
@@ -121,13 +121,13 @@ export const listConversationsForUser = query({
       });
     }
 
-    // Sort newest first
+ 
     result.sort((a, b) => b.updatedAt - a.updatedAt);
     return result;
   },
 });
 
-// Update lastReadAt when user opens a conversation
+
 export const markConversationRead = mutation({
   args: {
     conversationId: v.id("conversations"),
@@ -149,7 +149,7 @@ export const markConversationRead = mutation({
   },
 });
 
-// Typing indicator state
+
 export const setTyping = mutation({
   args: {
     conversationId: v.id("conversations"),
@@ -192,7 +192,7 @@ export const typingForConversation = query({
     for (const member of memberships) {
       if (member.userId === args.userId) continue;
       if (!member.isTyping) continue;
-      // Drop stale indicators after 2 seconds
+    
       if (now - member.typingUpdatedAt > 2000) continue;
 
       const user = await ctx.db.get(member.userId);
