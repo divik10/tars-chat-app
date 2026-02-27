@@ -7,10 +7,11 @@ export default function ProtectedLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen flex-col text-foreground">
       <Header />
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <main className="flex flex-1 items-center justify-center px-4 py-8">
+        {children}
+      </main>
     </div>
   );
 }
-

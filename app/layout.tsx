@@ -34,7 +34,8 @@ export default function RootLayout({
     >
       <html lang="en">
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-br from-slate-300 via-blue-100 to-slate-300`}
+          style={{ backgroundImage: "url('/chat-background.jpeg')" }}
         >
           <ConvexClientProvider>
             <UserSync />

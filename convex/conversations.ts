@@ -21,7 +21,7 @@ export const startConversation = mutation({
     userBId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const participantIds = [args.userAId, args.userBId];
+    const participantIds = [args.userAId, args.userBId].sort();
 
     // Try to find existing 1-1 conversation with these two participants
     const existing = await ctx.db

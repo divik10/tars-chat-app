@@ -43,31 +43,33 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="mx-auto mt-4 flex h-[70vh] max-w-5xl gap-0 rounded-xl border border-foreground/10 bg-background text-sm shadow-sm">
-      <div
-        className={`h-full ${
-          mobileView === "chat" ? "hidden md:flex" : "flex"
-        } w-full md:w-72`}
-      >
-        <ChatSidebar
-          selectedConversationId={selectedConversationId}
-          onSelectConversation={handleSelectConversation}
-          onConversationCreated={handleSelectConversation}
-          currentUserConvexId={currentUser?._id ?? null}
-        />
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col  bg-cover bg-center bg-fixed px-4 py-6 md:py-8">
+      <div className="mx-auto flex h-[75vh] w-full max-w-5xl rounded-3xl border border-slate-300 bg-white/95 text-sm shadow-2xl backdrop-blur-sm">
+        <div
+          className={`h-full ${
+            mobileView === "chat" ? "hidden md:flex" : "flex"
+          } w-full md:w-72`}
+        >
+          <ChatSidebar
+            selectedConversationId={selectedConversationId}
+            onSelectConversation={handleSelectConversation}
+            onConversationCreated={handleSelectConversation}
+            currentUserConvexId={currentUser?._id ?? null}
+          />
+        </div>
+        <div
+          className={`h-full flex-1 ${
+            mobileView === "list" ? "hidden md:flex" : "flex"
+          }`}
+        >
+          <ChatWindow
+            conversationId={selectedConversationId}
+            currentUserConvexId={currentUser?._id ?? null}
+            onBackToList={() => setMobileView("list")}
+          />
+        </div>
       </div>
-      <div
-        className={`h-full flex-1 ${
-          mobileView === "list" ? "hidden md:flex" : "flex"
-        }`}
-      >
-        <ChatWindow
-          conversationId={selectedConversationId}
-          currentUserConvexId={currentUser?._id ?? null}
-          onBackToList={() => setMobileView("list")}
-        />
-      </div>
-    </div>
+    </main>
   );
 }
 

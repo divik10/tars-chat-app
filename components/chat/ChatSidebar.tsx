@@ -57,7 +57,7 @@ export function ChatSidebar({
   };
 
   return (
-    <aside className="flex h-full w-full flex-col border-r border-foreground/10 bg-slate-50/70 shadow-sm md:w-72">
+    <aside className="flex h-full w-full flex-col border-r border-foreground/10 bg-slate-50 shadow-sm md:w-72">
       <div className="border-b border-foreground/10 p-3">
         <input
           value={search}
